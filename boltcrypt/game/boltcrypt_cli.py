@@ -1,5 +1,5 @@
 import sys
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import NaturalLanguage
 
 

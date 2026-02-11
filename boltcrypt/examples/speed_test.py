@@ -1,5 +1,5 @@
 import time
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 
 
 def benchmark_resets(env, resets=10000):

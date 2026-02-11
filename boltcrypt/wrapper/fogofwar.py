@@ -1,7 +1,7 @@
 import gymnasium as gym
 import numpy as np
 
-from boltcrypt.environ.boltcrypt import TILE_WALL
+from boltcrypt.envs.boltcrypt import TILE_WALL
 
 class FogOfWar(gym.ObservationWrapper):
     """

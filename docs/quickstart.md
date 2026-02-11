@@ -33,7 +33,7 @@ pip install boltcrypt
 ### Hello World
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 
 # Create environment
 env = BoltCrypt()
@@ -170,7 +170,7 @@ env = BoltCrypt(generator_config=config)
 ### Exploration Rewards
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import RoomDiscoveryReward
 
 env = BoltCrypt()
@@ -215,7 +215,7 @@ print(obs)  # Updated description
 ### Random Agent
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 
 env = BoltCrypt()
 
@@ -249,7 +249,7 @@ python -m boltcrypt.examples.tabular_q
 ```python
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 
 # Flatten dict observation for SB3
 from gymnasium.wrappers import FlattenObservation

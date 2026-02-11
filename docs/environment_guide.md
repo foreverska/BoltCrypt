@@ -276,7 +276,7 @@ python -m boltcrypt.examples.speed_test
 ### Basic Training Loop
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 
 env = BoltCrypt()
 obs, info = env.reset()
@@ -310,7 +310,7 @@ for config in configs:
 ### Wrapper Stacking
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import RoomDiscoveryReward, FogOfWar
 
 env = BoltCrypt()

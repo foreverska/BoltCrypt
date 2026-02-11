@@ -7,7 +7,7 @@ BoltCrypt includes three powerful wrappers to modify the environment for differe
 Wrappers follow the OpenAI Gymnasium pattern:
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import NaturalLanguage, FogOfWar, RoomDiscoveryReward
 
 env = BoltCrypt()
@@ -34,7 +34,7 @@ env = FogOfWar(env, vision_range=2)
 ### Usage
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import NaturalLanguage
 
 env = BoltCrypt()
@@ -191,7 +191,7 @@ while True:
 ### Usage
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import FogOfWar
 
 env = BoltCrypt()
@@ -295,7 +295,7 @@ for vr in [1, 2, 3]:
 ### Usage
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import RoomDiscoveryReward
 
 env = BoltCrypt()
@@ -464,7 +464,7 @@ class CustomRewardWrapper(gym.Wrapper):
 ```python
 class CustomActionWrapper(gym.ActionWrapper):
     def action(self, action):
-        # Transform action before passing to environ
+        # Transform action before passing to envs
         return modified_action
 ```
 

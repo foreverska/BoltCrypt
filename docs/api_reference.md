@@ -4,7 +4,7 @@
 
 ### BoltCrypt
 
-**Location:** `boltcrypt.env.BoltCrypt`
+**Location:** `boltcrypt.envs.BoltCrypt`
 
 OpenAI Gymnasium environment for procedurally generated dungeon exploration.
 
@@ -132,7 +132,7 @@ Returns multi-section text descriptions:
 #### Example Usage
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import NaturalLanguage
 
 env = BoltCrypt()
@@ -170,7 +170,7 @@ Replaces the full room `grid` with a `(2*vision_range + 1) × (2*vision_range + 
 #### Example Usage
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import FogOfWar
 
 env = BoltCrypt()
@@ -205,7 +205,7 @@ Tracks visited rooms by `global_pos`. First time entering a room adds `discovery
 #### Example Usage
 
 ```python
-from boltcrypt.environ import BoltCrypt
+from boltcrypt.envs import BoltCrypt
 from boltcrypt.wrapper import RoomDiscoveryReward
 
 env = BoltCrypt()
@@ -268,7 +268,7 @@ Generate complete dungeon layout. Automatically called by BoltCrypt.reset().
 
 ## Room
 
-**Location:** `boltcrypt.env.boltcrypt.Room`
+**Location:** `boltcrypt.envs.boltcrypt.Room`
 
 Represents a single dungeon room with puzzle mechanics.
 
@@ -305,7 +305,7 @@ Cached static grid background (walls, doors, switches, etc.). Dynamic entities l
 
 ### PuzzleType Enum
 
-**Location:** `boltcrypt.env.boltcrypt.PuzzleType`
+**Location:** `boltcrypt.envs.boltcrypt.PuzzleType`
 
 ```python
 class PuzzleType(Enum):

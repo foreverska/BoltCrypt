@@ -2,7 +2,7 @@ import pygame
 import numpy as np
 # Assuming the BoltCrypt class is in a file named boltcrypt.py
 # If you are running this in a single file, just paste the BoltCrypt class above this.
-from boltcrypt.environ.boltcrypt import BoltCrypt, Direction, TILE_STONE, TILE_WARP, TILE_KEY, TILE_BOULDER, TILE_SWITCH, TILE_EXIT, \
+from boltcrypt.envs.boltcrypt import BoltCrypt, Direction, TILE_STONE, TILE_WARP, TILE_KEY, TILE_BOULDER, TILE_SWITCH, TILE_EXIT, \
     TILE_DOOR, TILE_WALL, PuzzleType
 
 # --- CONSTANTS & COLORS ---
@@ -245,7 +245,7 @@ def play_dungeon():
         # Render
         render_gym(screen, font, env, obs, total_reward, done, status_msg)
         pygame.display.flip()
-        clock.tick(15)  # Cap FPS (Gym environ is instant, but visuals need time)
+        clock.tick(15)  # Cap FPS (Gym envs is instant, but visuals need time)
 
     pygame.quit()
 
