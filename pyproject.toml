@@ -22,11 +22,11 @@ dependencies = [
 "Github" = "https://github.com/foreverska/boltcrypt"
 
 [project.entry-points."gym.envs"]
-boltcrypt = "boltcrypt.env:BoltCrypt"
+boltcrypt = "boltcrypt.environ:BoltCrypt"
 
 [project.scripts]
 boltcrypt = "boltcrypt.game.boltcrypt_game:play_dungeon"
 boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:run_cli"
 
 [tool.setuptools]
-packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.env"]
+packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.environ"]
