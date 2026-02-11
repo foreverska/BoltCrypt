@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boltcrypt"
+version = "0.1.0"
+description = "Boltcrypt environment"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    { name = "foreverska" }
+]
+license = { file = "license.txt" }
+keywords = ["gymnasium", "gym"]
+dependencies = [
+    "gymnasium>=1.0.0",
+    "numpy",
+]
+
+[project.urls]
+"Github" = "https://github.com/foreverska/boltcrypt"
+
+[project.entry-points."gym.envs"]
+boltcrypt = "boltcrypt.env:BoltCrypt"
+
+[project.scripts]
+boltcrypt = "boltcrypt.game.boltcrypt_game:play_dungeon"
+boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:run_cli"
+
+[tool.setuptools]
+packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.env"]
