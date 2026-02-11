@@ -5,6 +5,6 @@ authors:
   given-names: "Adam"
   orcid: "https://orcid.org/0009-0002-7649-6527"
 title: "BoltCrypt"
-version: 0.1.0
+version: 0.1.1
 date-released: 2026-02-09
 url: "https://github.com/foreverska/boltcrypt"
