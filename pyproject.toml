@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "boltcrypt"
-version = "0.1.1"
+version = "0.1.2"
 description = "Boltcrypt environment"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -16,6 +16,8 @@ keywords = ["gymnasium", "gym"]
 dependencies = [
     "gymnasium>=1.0.0",
     "numpy",
+    "pygame",
+    "opencv-python"
 ]
 
 [project.urls]
@@ -25,8 +27,8 @@ dependencies = [
 boltcrypt = "boltcrypt.envs:BoltCrypt"
 
 [project.scripts]
-boltcrypt = "boltcrypt.game.boltcrypt_game:play_dungeon"
-boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:run_cli"
+boltcrypt = "boltcrypt.game.boltcrypt_game:main"
+boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:main"
 
 [tool.setuptools]
 packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.envs"]
