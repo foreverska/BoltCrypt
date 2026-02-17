@@ -27,8 +27,8 @@ dependencies = [
 boltcrypt = "boltcrypt.envs:BoltCrypt"
 
 [project.scripts]
-boltcrypt = "boltcrypt.game.boltcrypt_game:play_dungeon"
-boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:run_cli"
+boltcrypt = "boltcrypt.game.boltcrypt_game:main"
+boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:main"
 
 [tool.setuptools]
 packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.envs"]

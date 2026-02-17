@@ -1,9 +1,15 @@
+import argparse
 import pygame
 import numpy as np
+
 # Assuming the BoltCrypt class is in a file named boltcrypt.py
-# If you are running this in a single file, just paste the BoltCrypt class above this.
-from boltcrypt.envs.boltcrypt import BoltCrypt, Direction, TILE_STONE, TILE_WARP, TILE_KEY, TILE_BOULDER, TILE_SWITCH, TILE_EXIT, \
+from boltcrypt.envs.boltcrypt import BoltCrypt, Direction, TILE_STONE, TILE_WARP, TILE_KEY, TILE_BOULDER, TILE_SWITCH, \
+    TILE_EXIT, \
     TILE_DOOR, TILE_WALL, TILE_COLUMN, PuzzleType
+
+# Fallback dimensions if not explicitly imported from the environment
+MIN_ROOM_DIM = 4
+MAX_ROOM_DIM = 10
 
 # --- CONSTANTS & COLORS ---
 COLORS = {
@@ -16,7 +22,7 @@ COLORS = {
     6: (255, 215, 0),  # Key (Gold)
     7: (100, 100, 100),  # Stone (Grey)
     8: (148, 0, 211),  # Warp (Purple)
-    9: (255, 255, 255), # Column (White)
+    9: (255, 255, 255),  # Column (White)
     'AGENT': (50, 150, 255),
     'BG': (10, 10, 10),
     'TEXT': (220, 220, 220),
@@ -38,7 +44,7 @@ def draw_lock(screen, rect, color):
     pygame.draw.rect(screen, color,
                      (rect.centerx - 8, rect.top + 18, 16, 16))
     # Keyhole (Black dot)
-    pygame.draw.circle(screen, (0,0,0), (rect.centerx, rect.top + 26), 2)
+    pygame.draw.circle(screen, (0, 0, 0), (rect.centerx, rect.top + 26), 2)
 
 
 def render_gym(screen, font, env, obs, total_reward, done, text_status):
@@ -85,11 +91,9 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
                     check_dir = Direction.EAST
 
                 # 2. Check for Local Puzzle Lock (Boulder Puzzle not solved)
-                # If the current room is a BOULDER room and not solved, exits are blocked.
                 is_puzzle_locked = (env.curr_room.puzzle_type.name in ["BOULDER"] and not env.curr_room.is_solved)
 
                 # 2b. Check for Boulder Plates Lock
-                # For boulder_plates, only the door mapped to the active plate is unlocked
                 is_boulder_plates_locked = False
                 if env.curr_room.puzzle_type.name == "BOULDER_PLATES" and check_dir:
                     if env.curr_room.active_plate is None:
@@ -100,30 +104,25 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
                             is_boulder_plates_locked = True
 
                 if is_puzzle_locked:
-                    # Draw Red Lock (Requires solving the room)
                     draw_lock(screen, rect, (255, 50, 50))
                 elif is_boulder_plates_locked:
-                    # Draw Orange Lock (Requires moving boulder to correct plate)
                     draw_lock(screen, rect, (255, 140, 0))
-                    # 3. Check for Neighbor Key Lock (Target room requires key)
                 elif check_dir:
                     nx = env.gx + check_dir.value[0]
                     ny = env.gy + check_dir.value[1]
                     if (nx, ny) in env.generator.grid:
                         neighbor = env.generator.grid[(nx, ny)]
                         if neighbor.is_locked and not has_key:
-                            # Draw Gold Lock (Requires Key)
                             draw_lock(screen, rect, (255, 215, 0))
 
             elif tile_id == TILE_BOULDER:
                 pygame.draw.circle(screen, color, rect.center, TILE_SIZE // 2 - 4)
 
-            elif tile_id == TILE_STONE:  # Sailing Stone
+            elif tile_id == TILE_STONE:
                 pygame.draw.circle(screen, color, rect.center, TILE_SIZE // 2 - 6)
-                pygame.draw.circle(screen, (0, 0, 0), rect.center, TILE_SIZE // 2 - 6, 2)  # outline
+                pygame.draw.circle(screen, (0, 0, 0), rect.center, TILE_SIZE // 2 - 6, 2)
 
             elif tile_id == TILE_WARP:
-                # Draw a little spiral or distinct marker
                 pygame.draw.rect(screen, color, rect.inflate(-10, -10))
                 pygame.draw.rect(screen, (255, 255, 255), rect.inflate(-10, -10), 1)
 
@@ -141,14 +140,12 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
                 pygame.draw.rect(screen, color, rect.inflate(-10, -10))
 
     # 2. DRAW AGENT
-    # Note: Agent Pos is (x, y).
     ax, ay = agent_pos
     agent_rect = pygame.Rect(OFFSET_X + ax * TILE_SIZE, OFFSET_Y + ay * TILE_SIZE, TILE_SIZE, TILE_SIZE)
     pygame.draw.circle(screen, COLORS['AGENT'], agent_rect.center, 14)
     pygame.draw.circle(screen, (255, 255, 255), agent_rect.center, 14, 2)
 
     # 3. HUD
-    # Room Info
     curr_room = env.curr_room
     p_type = curr_room.puzzle_type.name if hasattr(curr_room, 'puzzle_type') else "none"
 
@@ -162,7 +159,6 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
     }
     p_type = p_type_map.get(p_type, "")
 
-    # Text Rendering
     lines = [
         f"Global Pos: {global_pos} | Local: {agent_pos}",
         f"Room Puzzle: {p_type}",
@@ -171,7 +167,6 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
         f"Status: {text_status}"
     ]
 
-    # Legend
     legend_start_y = 600
     for i, line in enumerate(lines):
         c = COLORS['TEXT']
@@ -180,19 +175,7 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
         screen.blit(surf, (20, legend_start_y + i * 25))
 
 
-def play_dungeon():
-    # Config: Enable ALL puzzles for testing
-    config = {
-        'min_dist': 5,
-        'mean_rooms': 15,
-        'std_rooms': 2,
-        'connectivity': 0.3,
-        'puzzle_density': 0.3,
-        'key_puzzle_prob': 0.3,
-        'puzzle_required': False,
-        'allowed_puzzles': ['boulder', 'mapped_plates', 'stone', 'warp_cycle'],
-    }
-
+def play_dungeon(config):
     env = BoltCrypt(generator_config=config)
     obs, _ = env.reset()
     total_reward = 0
@@ -211,7 +194,6 @@ def play_dungeon():
     while running:
         action = None
 
-        # Event Handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -223,23 +205,19 @@ def play_dungeon():
                     done = False
                     status_msg = "Reset!"
                 elif not done:
-                    # Input Mapping
                     if event.key == pygame.K_UP:
-                        action = 1  # North (Standard Gym usually)
+                        action = 1
                     elif event.key == pygame.K_DOWN:
-                        action = 0  # South
+                        action = 0
                     elif event.key == pygame.K_RIGHT:
-                        action = 2  # East
+                        action = 2
                     elif event.key == pygame.K_LEFT:
-                        action = 3  # West
+                        action = 3
 
-                    # Update Status based on input
                     if action is not None:
-                        # Step Environment
                         obs, reward, done, trunc, info = env.step(action)
                         total_reward += reward
 
-                        # Feedback
                         if reward > 0.5 and reward < 5.0:
                             status_msg = "Nice! (+Reward)"
                         elif reward <= -0.01:
@@ -247,13 +225,43 @@ def play_dungeon():
 
                         if done: status_msg = "VICTORY!"
 
-        # Render
         render_gym(screen, font, env, obs, total_reward, done, status_msg)
         pygame.display.flip()
-        clock.tick(15)  # Cap FPS (Gym envs is instant, but visuals need time)
+        clock.tick(15)
 
     pygame.quit()
 
+def main():
+    parser = argparse.ArgumentParser(description="Play BoltCrypt with custom DungeonGenerator settings.")
+
+    # Core generation parameters
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for the dungeon generation.")
+    parser.add_argument("--min_dist", type=int, default=5, help="Minimum distance to the exit.")
+    parser.add_argument("--max_dist", type=int, default=None, help="Maximum distance to the exit.")
+    parser.add_argument("--mean_rooms", type=int, default=15, help="Average number of rooms to generate.")
+    parser.add_argument("--std_rooms", type=int, default=2, help="Standard deviation for the room count.")
+    parser.add_argument("--connectivity", type=float, default=0.3, help="Probability of creating loops in the map.")
+
+    # Puzzle parameters
+    parser.add_argument("--puzzle_density", type=float, default=0.3, help="Probability of a room containing a puzzle.")
+    parser.add_argument("--key_puzzle_prob", type=float, default=0.3, help="Probability of the exit requiring a key.")
+    parser.add_argument("--puzzle_required", action="store_true",
+                        help="Forces the room before the exit to have a puzzle.")
+
+    # Pass multiple arguments for allowed puzzles (e.g., --allowed_puzzles boulder stone)
+    parser.add_argument("--allowed_puzzles", nargs="+", default=['boulder', 'mapped_plates', 'stone', 'warp_cycle'],
+                        help="List of allowed puzzle types. Space separated.")
+
+    # Room dimensions
+    parser.add_argument("--min_room_dim", type=int, default=MIN_ROOM_DIM, help="Minimum width/height for a room.")
+    parser.add_argument("--max_room_dim", type=int, default=MAX_ROOM_DIM, help="Maximum width/height for a room.")
+
+    args = parser.parse_args()
+
+    # Convert argparse Namespace directly to a dictionary to pass to generator_config
+    config_dict = vars(args)
+
+    play_dungeon(config_dict)
 
 if __name__ == "__main__":
-    play_dungeon()
+    main()
