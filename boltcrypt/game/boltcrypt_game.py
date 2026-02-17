@@ -3,7 +3,7 @@ import numpy as np
 # Assuming the BoltCrypt class is in a file named boltcrypt.py
 # If you are running this in a single file, just paste the BoltCrypt class above this.
 from boltcrypt.envs.boltcrypt import BoltCrypt, Direction, TILE_STONE, TILE_WARP, TILE_KEY, TILE_BOULDER, TILE_SWITCH, TILE_EXIT, \
-    TILE_DOOR, TILE_WALL, PuzzleType
+    TILE_DOOR, TILE_WALL, TILE_COLUMN, PuzzleType
 
 # --- CONSTANTS & COLORS ---
 COLORS = {
@@ -16,6 +16,7 @@ COLORS = {
     6: (255, 215, 0),  # Key (Gold)
     7: (100, 100, 100),  # Stone (Grey)
     8: (148, 0, 211),  # Warp (Purple)
+    9: (255, 255, 255), # Column (White)
     'AGENT': (50, 150, 255),
     'BG': (10, 10, 10),
     'TEXT': (220, 220, 220),
@@ -85,7 +86,7 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
 
                 # 2. Check for Local Puzzle Lock (Boulder Puzzle not solved)
                 # If the current room is a BOULDER room and not solved, exits are blocked.
-                is_puzzle_locked = (env.curr_room.puzzle_type.name == "BOULDER" and not env.curr_room.is_solved)
+                is_puzzle_locked = (env.curr_room.puzzle_type.name in ["BOULDER"] and not env.curr_room.is_solved)
 
                 # 2b. Check for Boulder Plates Lock
                 # For boulder_plates, only the door mapped to the active plate is unlocked
@@ -136,6 +137,9 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
             elif tile_id == TILE_EXIT:
                 pygame.draw.rect(screen, color, rect)
 
+            elif tile_id == TILE_COLUMN:
+                pygame.draw.rect(screen, color, rect.inflate(-10, -10))
+
     # 2. DRAW AGENT
     # Note: Agent Pos is (x, y).
     ax, ay = agent_pos
@@ -179,13 +183,14 @@ def render_gym(screen, font, env, obs, total_reward, done, text_status):
 def play_dungeon():
     # Config: Enable ALL puzzles for testing
     config = {
-        'min_dist': 4,
-        'mean_rooms': 12,
+        'min_dist': 5,
+        'mean_rooms': 15,
+        'std_rooms': 2,
+        'connectivity': 0.3,
         'puzzle_density': 0.3,
         'key_puzzle_prob': 0.3,
-        'min_room_dim': 5,
-        'max_room_dim': 9,
-        'allowed_puzzles': ["boulder", "mapped_plates", "stone", "warp_cycle"],
+        'puzzle_required': False,
+        'allowed_puzzles': ['boulder', 'mapped_plates', 'stone', 'warp_cycle'],
     }
 
     env = BoltCrypt(generator_config=config)

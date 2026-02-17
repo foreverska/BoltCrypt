@@ -8,9 +8,12 @@ def run_cli():
     config = {
         'min_dist': 5,
         'mean_rooms': 15,
+        'std_rooms': 2,
+        'connectivity': 0.3,
         'puzzle_density': 0.3,
-        'key_puzzle_prob': 0.4,
-        'allowed_puzzles': ["mapped_plates", "stone", "warp_cycle"]
+        'key_puzzle_prob': 0.3,
+        'puzzle_required': False,
+        'allowed_puzzles': ['boulder', 'mapped_plates', 'stone', 'warp_cycle'],
     }
 
     env = BoltCrypt(generator_config=config)
