@@ -24,6 +24,7 @@ BoltCrypt(generator_config=None, puzzle_bonus=True, key_bonus=True)
   - `puzzle_density` (float): Probability of puzzles in rooms, 0-1 (default: 0.0)
   - `allowed_puzzles` (list): List of puzzle type strings (default: all types)
   - `key_puzzle_prob` (float): Probability of key-lock puzzle, 0-1 (default: 0.0)
+  - `trap_prob` (float): Probability an off-route room seals behind the agent for the rest of the episode, 0-1 (default: 0.0). `info['trapped']` reports it
   - `randomize_end_distance` (bool): Randomize distance from min_dist to 2*min_dist
 - `puzzle_bonus` (bool): Grant +1.0 reward for solving boulder puzzles (default: True)
 - `key_bonus` (bool): Grant +1.0 reward for collecting keys (default: True)
@@ -239,6 +240,7 @@ DungeonGenerator(
     puzzle_density=0.0,
     allowed_puzzles=None,
     key_puzzle_prob=0.0,
+    trap_prob=0.0,
     min_room_dim=4,
     max_room_dim=10
 )

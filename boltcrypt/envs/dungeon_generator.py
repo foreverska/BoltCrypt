@@ -15,10 +15,11 @@ class DungeonGenerator:
     3. Selecting an exit room from valid vault candidates
     4. Adding extra connectivity (loops)
     5. Placing puzzles and optional key-lock mechanisms
+    6. Marking optional trap rooms that seal behind the agent
     """
     def __init__(self, seed: int = None, min_dist=5, max_dist=None, mean_rooms=15, std_rooms=2, connectivity=0.5,
                  puzzle_density=0.0, allowed_puzzles=None, key_puzzle_prob=0.0, puzzle_required=False,
-                 min_room_dim=MIN_ROOM_DIM, max_room_dim=MAX_ROOM_DIM):
+                 min_room_dim=MIN_ROOM_DIM, max_room_dim=MAX_ROOM_DIM, trap_prob=0.0):
         """
         Initialize the dungeon generator with configuration parameters.
 
@@ -35,6 +36,8 @@ class DungeonGenerator:
             puzzle_required: If True, guarantees a puzzle in the room leading to exit vault (overrides puzzle_density for that room)
             min_room_dim: Minimum room dimension
             max_room_dim: Maximum room dimension
+            trap_prob: Probability (0-1) that an off-route room becomes a trap whose doors seal
+                once entered. Traps never cut the start off from the key or exit.
         """
         self.seed(seed)
         self.rng = random.Random(seed)
@@ -43,7 +46,7 @@ class DungeonGenerator:
             'min_dist': min_dist, 'max_dist': max_dist, 'mean_rooms': mean_rooms,
             'std_rooms': std_rooms, 'connectivity': connectivity,
             'puzzle_density': puzzle_density, 'key_puzzle_prob': key_puzzle_prob,
-            'puzzle_required': puzzle_required
+            'puzzle_required': puzzle_required, 'trap_prob': trap_prob
         }
         # Default to all puzzles if not specified
         self.allowed_puzzles = allowed_puzzles if allowed_puzzles else ["boulder", "mapped_plates", "stone", "warp_cycle", "warp_rnd"]
@@ -107,6 +110,9 @@ class DungeonGenerator:
         for pos, r in self.grid.items():
             r.setup_puzzle(self.rng, self.config['puzzle_density'], self.allowed_puzzles)
             r.freeze()
+
+        # Last, and draws nothing when disabled, so a seed yields the same layout with or without traps
+        self._apply_traps()
 
     def _connect_rooms(self, r1, r2, direction):
         if direction in r1.doors: return
@@ -255,7 +261,7 @@ class DungeonGenerator:
                 if n_pos in self.grid and d not in room.doors:
                     neighbor = self.grid[n_pos]
                     if neighbor.is_exit or neighbor.is_start: continue
-                    if self.rng.random() > self.config['connectivity']:
+                    if self.rng.random() < self.config['connectivity']:
                         self._connect_rooms(room, neighbor, d)
 
     def _apply_key_puzzle(self):
@@ -287,3 +293,35 @@ class DungeonGenerator:
         else:
             # Fallback: No dead ends exist (rare, but possible in loops), pick a random inner room
             self.rng.choice(inner_rooms).place_key(self.rng)
+
+    def _connects_required(self, blocked):
+        """True if start, exit and key rooms are mutually reachable without entering a blocked room."""
+        required = {self.end_pos} | {pos for pos, r in self.grid.items() if r.has_key}
+        seen, frontier = {self.start_pos}, [self.start_pos]
+        while frontier:
+            pos = frontier.pop()
+            for d in self.grid[pos].doors:
+                n_pos = (pos[0] + d.value[0], pos[1] + d.value[1])
+                if n_pos in self.grid and n_pos not in seen and n_pos not in blocked:
+                    seen.add(n_pos)
+                    frontier.append(n_pos)
+        return required <= seen
+
+    def _apply_traps(self):
+        """
+        Mark rooms that seal behind the agent, making the episode unrecoverable.
+
+        Each room other than start, exit and the key room is proposed with probability trap_prob,
+        in random order, and kept only if the critical rooms stay connected around every trap.
+        """
+        if self.config['trap_prob'] <= 0: return
+        traps = set()
+        order = sorted(self.grid)
+        self.rng.shuffle(order)
+        for pos in order:
+            room = self.grid[pos]
+            if room.is_start or room.is_exit or room.has_key: continue
+            if self.rng.random() >= self.config['trap_prob']: continue
+            if self._connects_required(traps | {pos}):
+                traps.add(pos)
+                room.is_trap = True

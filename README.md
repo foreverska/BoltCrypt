@@ -55,6 +55,7 @@ The DungeonGenerator and BoltCrypt environment can be customized via a config di
 **connectivity:** Probability of creating loops between rooms (0.0 = Tree, 1.0 = Highly connected).
 **puzzle_density:** Chance of a room containing a boulder puzzle.  
 **key_puzzle_prob:** Chance that the exit is locked and a key is hidden in a leaf room.  
+**trap_prob:** Chance that an off-route room is a trap: its doors seal once entered, for the rest of the episode. Traps never cut off the start, key, or exit.  
 **randomize_end_distance:** If True, randomizes the actual distance from min_dist to 2*min_dist.  
 
 
