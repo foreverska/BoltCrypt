@@ -22,6 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+jax = ["jax>=0.4.30"]
 
 [project.urls]
 "Github" = "https://github.com/foreverska/boltcrypt"
@@ -34,7 +35,7 @@ boltcrypt = "boltcrypt.game.boltcrypt_game:main"
 boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:main"
 
 [tool.setuptools]
-packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.envs"]
+packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.envs", "boltcrypt.jaxenv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

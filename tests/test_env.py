@@ -175,3 +175,29 @@ def test_natlang_text_is_reproducible():
         return out
 
     assert transcript() == transcript()
+
+
+def test_puzzle_bonus_paid_once_per_room():
+    cfg = dict(min_dist=2, mean_rooms=4, std_rooms=0, puzzle_density=1.0, allowed_puzzles=["boulder"],
+               min_room_dim=9, max_room_dim=10)
+    env = BoltCrypt(generator_config=cfg)
+    for seed in range(200):
+        env.reset(seed=seed)
+        room = next((r for r in env.generator.grid.values()
+                     if r.puzzle_type == PuzzleType.BOULDER and len(r.boulders) == 1), None)
+        if room is None:
+            continue
+        sy, sx = next(iter(room.switches))
+        if 3 <= sx <= room.w - 5 and 2 <= sy <= room.h - 4:
+            break
+    else:
+        pytest.fail("no suitable boulder room")
+
+    # Boulder just west of its plate, agent west of the boulder
+    room.boulders = [[sy, sx - 1]]
+    env.curr_room, env.gx, env.gy, env.ly, env.lx = room, room.x, room.y, sy, sx - 2
+    # Push on, push off east, walk around, push back on; twice
+    pushes = [2, 2, 0, 2, 2, 1, 3] + [2, 2, 0, 2, 2, 1, 3]
+    rewards = [env.step(a)[1] for a in pushes]
+    assert room.is_solved
+    assert rewards.count(1.0) == 1

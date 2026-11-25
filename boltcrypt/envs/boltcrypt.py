@@ -161,9 +161,10 @@ class BoltCrypt(gym.Env):
                         self.curr_room.boulders[b_idx] = [push_ly, push_lx]
                         self.lx, self.ly = target_lx, target_ly
 
-                        previously_solved = getattr(self.curr_room, 'is_solved', False)
+                        # Bonus only the first time a room is solved, not on every re-solve
+                        already_rewarded = self.curr_room.previously_solved
                         solved = self.curr_room.check_solved()
-                        if not previously_solved and solved and self.puzzle_bonus:
+                        if not already_rewarded and solved and self.puzzle_bonus:
                             reward = 1.0
 
             # Standard Movement
