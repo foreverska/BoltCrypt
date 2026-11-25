@@ -68,6 +68,7 @@ config = {
         'warp_rnd'
     ],
     'key_puzzle_prob': 0.5,   # Probability of key-lock mechanism
+    'trap_prob': 0.0,         # Off-route rooms that seal behind the agent (irreversible)
     'randomize_end_distance': True  # Randomize end from min to 2*min
 }
 

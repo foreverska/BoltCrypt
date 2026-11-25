@@ -5,6 +5,7 @@ import gymnasium.spaces as spaces
 
 from boltcrypt.envs.defines import *
 from boltcrypt.envs.dungeon_generator import DungeonGenerator
+from boltcrypt.envs.step_noise import NOISE_WARP, step_randint
 
 class BoltCrypt(gym.Env):
     """
@@ -45,6 +46,7 @@ class BoltCrypt(gym.Env):
         self.ly = None
         self.episode_step = None
         self.inventory_has_key = None
+        self.level_seed = None
 
         # Obs: Grid + AgentPos + GlobalPos + Inventory
         self.observation_space = spaces.Dict({
@@ -66,6 +68,11 @@ class BoltCrypt(gym.Env):
             tuple: (observation dict, info dict)
         """
         super().reset(seed=seed)
+        # Unseeded resets draw the level from the env's own RNG, so a seeded first reset
+        # makes the whole sequence of levels reproducible
+        if seed is None:
+            seed = int(self.np_random.integers(0, 2**31 - 1))
+        self.level_seed = seed
         self.generator.seed(seed)
         self.generator.generate()
 
@@ -93,10 +100,13 @@ class BoltCrypt(gym.Env):
                 - reward: Float reward (-0.01 per step, +1.0 for key/puzzle, +10.0 for exit)
                 - done: Bool indicating episode termination (reaching exit)
                 - truncated: Bool (always False)
-                - info: Dict (empty)
+                - info: Dict with 'trapped' (True once a trap room has sealed the agent in)
         """
+        t = self.episode_step
+        self.episode_step += 1
+
         # 0. PRE-MOVE: Sailing Stones Move
-        self.curr_room.move_stones(self.generator.rng, (self.ly, self.lx))
+        self.curr_room.move_stones(self.level_seed, t, (self.ly, self.lx))
 
         # 1. PARSE ACTION
         dx, dy, direction = 0, 0, None
@@ -173,6 +183,10 @@ class BoltCrypt(gym.Env):
                             if unlocked_door != direction:
                                 is_locked = True
 
+                    # A sprung trap never opens again
+                    if self.curr_room.sprung:
+                        is_locked = True
+
                     # If unlocked, trigger room transition
                     if not is_locked and direction and direction in getattr(self.curr_room, 'doors', {}):
                         next_gx = self.gx + direction.value[0]
@@ -184,6 +198,8 @@ class BoltCrypt(gym.Env):
                             if not (getattr(target_room, 'is_locked', False) and not getattr(self, 'inventory_has_key', False)):
                                 self.gx, self.gy = next_gx, next_gy
                                 self.curr_room = target_room
+                                if target_room.is_trap:
+                                    target_room.sprung = True
                                 off = self.curr_room.doors.get(direction.opposite, 0)
 
                                 # Place player one tile in front of the door
@@ -215,14 +231,14 @@ class BoltCrypt(gym.Env):
                 dest = warp_info
             elif getattr(self.curr_room, 'warp_mode', None) == PuzzleType.WARP_RND:
                 opts = [w for w in warp_info if w != (self.ly, self.lx)]
-                if opts: dest = self.generator.rng.choice(opts)
+                if opts: dest = opts[step_randint(len(opts), self.level_seed, t, NOISE_WARP)]
 
             if dest:
                 stone_at_dest = any(s[0] == dest[0] and s[1] == dest[1] for s in getattr(self.curr_room, 'stones', []))
                 if not stone_at_dest:
                     self.ly, self.lx = dest
 
-        return self._get_obs(), reward, done, False, {}
+        return self._get_obs(), reward, done, False, {"trapped": self.curr_room.sprung}
 
     def _get_obs(self):
         # Create a base grid
@@ -282,7 +298,7 @@ class BoltCrypt(gym.Env):
         return img
 
     def render(self):
-        if self.render_mode == "rgb":
+        if self.render_mode in ("rgb", "rgb_array"):
             return self.obs_to_rgb()
         elif self.render_mode == "human":
             img = self.obs_to_rgb()

@@ -1,6 +1,7 @@
 import numpy as np
 
 from boltcrypt.envs.defines import *
+from boltcrypt.envs.step_noise import DIRECTION_PERMS, NOISE_STONE, step_randint
 
 class Room:
     """
@@ -12,7 +13,7 @@ class Room:
     __slots__ = ['x', 'y', 'w', 'h', 'is_start', 'is_exit', 'is_locked', 'has_key',
                  'doors', '_cached_grid', 'switches', 'columns', 'boulders', 'stones', 'warps',
                  'warp_mode', 'puzzle_type', 'is_solved', 'previously_solved', 'key_pos',
-                 'active_plate', 'plate_door_map']
+                 'active_plate', 'plate_door_map', 'is_trap', 'sprung']
 
     def __init__(self, x: int, y: int, w: int, h: int, is_start=False, is_exit=False):
         """
@@ -33,6 +34,8 @@ class Room:
         self.is_locked = False
         self.has_key = False
         self.key_pos = None
+        self.is_trap = False  # Doors seal for the rest of the episode once entered
+        self.sprung = False
 
         self.doors = {}
         self.puzzle_type = PuzzleType.NONE
@@ -180,6 +183,9 @@ class Room:
         """
         if self.is_start or self.is_exit or self.has_key:
             return
+        # Already assigned (e.g. by puzzle_required); a second pass would stack puzzle state
+        if self.puzzle_type != PuzzleType.NONE:
+            return
         if rng.random() > puzzle_density:
             return
         if not allowed_types:
@@ -223,7 +229,7 @@ class Room:
         if candidates:
             self.key_pos = rng.choice(candidates)
 
-    def move_stones(self, rng, agent_pos):
+    def move_stones(self, level_seed, step, agent_pos):
         """
         Move all sailing stones one step randomly (for RND puzzle type).
 
@@ -231,19 +237,20 @@ class Room:
         other stones, or the agent's position.
 
         Args:
-            rng: Random number generator instance
+            level_seed: Seed of the current level (see step_noise)
+            step: Episode step index, so the draw is a pure function of (level, step)
             agent_pos: Current (y, x) position of the agent to avoid collisions
         """
         if not self.stones: return
 
+        moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]
         for i in range(len(self.stones)):
             sy, sx = self.stones[i]
 
-            # Try random directions
-            moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-            rng.shuffle(moves)
+            # Try directions in a random order
+            perm = DIRECTION_PERMS[step_randint(len(DIRECTION_PERMS), level_seed, step, NOISE_STONE, i)]
 
-            for dy, dx in moves:
+            for dy, dx in (moves[k] for k in perm):
                 ny, nx = sy + dy, sx + dx
 
                 # Check Bounds & Walls

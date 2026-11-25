@@ -30,6 +30,7 @@ class NaturalLanguage(gym.Wrapper):
         self.last_obs = None
         self.just_entered_room = True  # trigger flavor text on first spawn
         self.room_ident = room_ident
+        self._text_rng = random.Random()  # reseeded from the level seed on every reset
 
         if map_size is not None and map_size % 2 == 0:
             raise ValueError("Map size must be odd.")
@@ -91,8 +92,9 @@ class NaturalLanguage(gym.Wrapper):
             tuple: (text description, info dict)
         """
         obs, info = self.env.reset(**kwargs)
+        self._text_rng = random.Random(self.unwrapped.level_seed)
         self.last_gx, self.last_gy = obs['global_pos']
-        self.last_solved = self.env.curr_room.check_solved()
+        self.last_solved = self.unwrapped.curr_room.check_solved()
         self.last_obs = obs
         self.just_entered_room = True
 
@@ -149,6 +151,7 @@ class NaturalLanguage(gym.Wrapper):
                 return "System: Session Terminated.", 0, True, False, {}
             if cmd == 'reset':
                 obs, _ = self.env.reset()
+                self._text_rng = random.Random(self.unwrapped.level_seed)
                 self.last_gx, self.last_gy = obs['global_pos']
                 self.last_solved = True
                 self.last_obs = obs
@@ -171,7 +174,7 @@ class NaturalLanguage(gym.Wrapper):
 
         # 2. PRE-COMPUTE
         prev_pos = self.last_obs['agent_pos']
-        prev_boulders = [list(b) for b in self.env.curr_room.boulders]
+        prev_boulders = [list(b) for b in self.unwrapped.curr_room.boulders]
 
         # 3. STEP
         obs, reward, done, trunc, info = self.env.step(action)
@@ -199,8 +202,10 @@ class NaturalLanguage(gym.Wrapper):
                 entered_from = "UNKNOWN"
 
             events.append(f"You step through the door and enter a new room from its {entered_from}.")
+            if self.unwrapped.curr_room.sprung:
+                events.append("BOOM! The doors slam shut behind you and seal.")
             self.last_gx, self.last_gy = curr_gx, curr_gy
-            self.last_solved = self.env.curr_room.check_solved()
+            self.last_solved = self.unwrapped.curr_room.check_solved()
         else:
             self.just_entered_room = False
             # Movement checks
@@ -215,11 +220,11 @@ class NaturalLanguage(gym.Wrapper):
                 events.append(f"BLOCKED. You bump into a solid obstacle trying to move {action_input}.")
 
             # Interaction checks
-            curr_boulders = self.env.curr_room.boulders
+            curr_boulders = self.unwrapped.curr_room.boulders
             for i, b in enumerate(curr_boulders):
                 if b != prev_boulders[i]:
                     events.append("You heave the massive BOULDER forward.")
-                    if tuple(b) in self.env.curr_room.switches:
+                    if tuple(b) in self.unwrapped.curr_room.switches:
                         events.append("CLICK! It locks into the pressure plate.")
 
         # Key check
@@ -227,7 +232,7 @@ class NaturalLanguage(gym.Wrapper):
             events.append("SUCCESS! You acquired the GOLDEN KEY.")
 
         # Solved check
-        is_solved = self.env.curr_room.check_solved()
+        is_solved = self.unwrapped.curr_room.check_solved()
         if is_solved and not self.last_solved:
             events.append("MECHANISM: Gears grind and locks disengage. The exits are open.")
         self.last_solved = is_solved
@@ -239,13 +244,30 @@ class NaturalLanguage(gym.Wrapper):
 
         return self._generate_text(obs, reward, done, event_str), reward, done, trunc, info
 
+    def _door_state(self, room, direction):
+        """
+        Describe whether a door can be walked through, mirroring the lock checks in BoltCrypt.step.
+        """
+        if room.sprung:
+            return "(SEALED)"
+        if room.puzzle_type.name == "BOULDER" and not room.is_solved:
+            return "(LOCKED)"
+        if room.puzzle_type.name == "BOULDER_PLATES":
+            if room.active_plate is None or room.plate_door_map.get(room.active_plate) != direction:
+                return "(LOCKED)"
+        base = self.unwrapped
+        target = base.generator.grid.get((base.gx + direction.value[0], base.gy + direction.value[1]))
+        if target is not None and target.is_locked and not base.inventory_has_key:
+            return "(LOCKED, NEEDS KEY)"
+        return "(OPEN)"
+
     def _get_flavor_text(self, room):
         """
         Generate atmospheric flavor text based on room puzzle type.
         """
         p_type = room.puzzle_type.name
         if p_type not in self.flavor_texts: p_type = "NONE"
-        return random.choice(self.flavor_texts[p_type])
+        return self._text_rng.choice(self.flavor_texts[p_type])
 
     def _get_room_fingerprint(self, gx, gy):
         """
@@ -260,7 +282,7 @@ class NaturalLanguage(gym.Wrapper):
         """
         Generate complete text description of current game state.
         """
-        room = self.env.curr_room
+        room = self.unwrapped.curr_room
         lx, ly = obs['agent_pos']
         gx, gy = obs['global_pos']
         w, h = room.w, room.h
@@ -287,7 +309,7 @@ class NaturalLanguage(gym.Wrapper):
                 variant_idx = zlib.adler32(f"{gx},{gy},var".encode()) % len(scrawl_variants)
                 out.append(scrawl_variants[variant_idx])
 
-            if room.is_locked and not room.has_puzzle:
+            if any(self._door_state(room, d) == "(LOCKED, NEEDS KEY)" for d in room.doors):
                 out.append("NOTICE: The door ahead is locked. You need a key.")
 
         # --- 3. TACTICAL OVERVIEW (Textual) ---
@@ -312,7 +334,7 @@ class NaturalLanguage(gym.Wrapper):
             dx = door_x - lx
             dy = door_y - ly
             direction_text = self._get_relative_dir(dx, dy)
-            state = "(OPEN)" if (room.is_solved or room.puzzle_type.name == "NONE") else "(LOCKED)"
+            state = self._door_state(room, d)
             door_descs.append(f"A door is {direction_text} from you: {state}")
 
         out.append("EXITS: " + ", ".join(door_descs))
@@ -425,12 +447,14 @@ class NaturalLanguage(gym.Wrapper):
         """
         Generate a context-aware hint based on the current puzzle type and state.
         """
-        room = self.env.curr_room
+        room = self.unwrapped.curr_room
         puzzle_type = room.puzzle_type.name
 
         hint_text = "\n--- HINT REQUESTED ---\n"
 
-        if puzzle_type == "NONE":
+        if room.sprung:
+            hint_text += "This room was a trap. Its doors are sealed and will not open again."
+        elif puzzle_type == "NONE":
             if room.is_exit:
                 hint_text += "This room contains the EXIT! Step onto the center tile to escape the dungeon."
             elif room.has_key and self.last_obs['inventory'] == 0:
@@ -446,7 +470,7 @@ class NaturalLanguage(gym.Wrapper):
                               "Not much happening here, exit the room to continue exploring.",
                               "Have you tried all doors?",
                               "Try keeping systematic notes on room details to remind you where you've been and which doors you've tried."]
-                hint_text += random.choice(hint_texts)
+                hint_text += self._text_rng.choice(hint_texts)
 
         elif puzzle_type == "BOULDER":
             hint_text += "BOULDER PUZZLE: Push boulders onto pressure plates to unlock the doors.\n"
@@ -463,13 +487,13 @@ class NaturalLanguage(gym.Wrapper):
                     "TIP: Boulders can not be pushed up against a wall, they seem immobile if you try.",
                     "TIP: Try walking into the boulder from the other side if it seems immobile."
                 ]
-                hint_text += random.choice(hint_texts)
+                hint_text += self._text_rng.choice(hint_texts)
             else:
                 hint_text += "All pressure plates are activated! The doors should be unlocked. Have you tried all doors?"
 
         elif puzzle_type == "STONE":
             hint_text += "SAILING STONE PUZZLE: Mystical stones move on their own across the floor.\n"
-            hint_text += "TIP: Wait and observe their movement patterns. They push boulders and trigger pressure plates automatically. Sometimes patience is the solution."
+            hint_text += "TIP: Wait and observe their movement patterns. They block your path like walls, and they never move onto your tile. Sometimes patience is the solution."
 
         elif puzzle_type == "WARP_CYCLE":
             hint_text += "WARP CYCLE PUZZLE: Stepping on warp tiles will teleport you in a predictable pattern.\n"

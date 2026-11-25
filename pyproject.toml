@@ -20,6 +20,9 @@ dependencies = [
     "opencv-python"
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
 [project.urls]
 "Github" = "https://github.com/foreverska/boltcrypt"
 
@@ -32,3 +35,6 @@ boltcrypt_cli = "boltcrypt.game.boltcrypt_cli:main"
 
 [tool.setuptools]
 packages = ["boltcrypt", "boltcrypt.game", "boltcrypt.wrapper", "boltcrypt.envs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
