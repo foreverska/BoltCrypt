@@ -124,6 +124,8 @@ def build_bank(generator_config: dict, seeds) -> dict:
         for i, lvl in enumerate(levels):
             padded[i, :len(lvl[key])] = lvl[key]
         bank[key] = padded
+    # Warp candidate lists only need to be as long as the largest warp room in the bank
+    bank["cands"] = bank["cands"][:, :, :max(1, int(bank["n_cands"].max()))]
     bank["max_room_dim"] = np.int32(env.generator.max_room_dim)
     bank["config_json"] = np.array(json.dumps({"generator_config": generator_config,
                                                "bank_version": BANK_VERSION}))

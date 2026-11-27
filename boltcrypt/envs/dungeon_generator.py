@@ -16,10 +16,12 @@ class DungeonGenerator:
     4. Adding extra connectivity (loops)
     5. Placing puzzles and optional key-lock mechanisms
     6. Marking optional trap rooms that seal behind the agent
+    7. Scattering optional lava tiles that end the episode
     """
     def __init__(self, seed: int = None, min_dist=5, max_dist=None, mean_rooms=15, std_rooms=2, connectivity=0.5,
                  puzzle_density=0.0, allowed_puzzles=None, key_puzzle_prob=0.0, puzzle_required=False,
-                 min_room_dim=MIN_ROOM_DIM, max_room_dim=MAX_ROOM_DIM, trap_prob=0.0):
+                 min_room_dim=MIN_ROOM_DIM, max_room_dim=MAX_ROOM_DIM, trap_prob=0.0,
+                 lava_density=0.0):
         """
         Initialize the dungeon generator with configuration parameters.
 
@@ -38,6 +40,9 @@ class DungeonGenerator:
             max_room_dim: Maximum room dimension
             trap_prob: Probability (0-1) that an off-route room becomes a trap whose doors seal
                 once entered. Traps never cut the start off from the key or exit.
+            lava_density: Probability (0-1) that each interior tile of a puzzle-free room becomes
+                lava, which ends the episode when stepped on. A tile is only kept if the room's
+                doorways, centre and key stay mutually reachable around the lava.
         """
         self.seed(seed)
         self.rng = random.Random(seed)
@@ -46,7 +51,8 @@ class DungeonGenerator:
             'min_dist': min_dist, 'max_dist': max_dist, 'mean_rooms': mean_rooms,
             'std_rooms': std_rooms, 'connectivity': connectivity,
             'puzzle_density': puzzle_density, 'key_puzzle_prob': key_puzzle_prob,
-            'puzzle_required': puzzle_required, 'trap_prob': trap_prob
+            'puzzle_required': puzzle_required, 'trap_prob': trap_prob,
+            'lava_density': lava_density
         }
         # Default to all puzzles if not specified
         self.allowed_puzzles = allowed_puzzles if allowed_puzzles else ["boulder", "mapped_plates", "stone", "warp_cycle", "warp_rnd"]
@@ -113,6 +119,7 @@ class DungeonGenerator:
 
         # Last, and draws nothing when disabled, so a seed yields the same layout with or without traps
         self._apply_traps()
+        self._apply_lava()
 
     def _connect_rooms(self, r1, r2, direction):
         if direction in r1.doors: return
@@ -325,3 +332,44 @@ class DungeonGenerator:
             if self._connects_required(traps | {pos}):
                 traps.add(pos)
                 room.is_trap = True
+
+    @staticmethod
+    def _lava_keeps_room_connected(room, lava, protected):
+        """True if every protected tile is reachable from the first one without crossing lava."""
+        start = protected[0]
+        seen, frontier = {start}, [start]
+        while frontier:
+            y, x = frontier.pop()
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 1 <= ny < room.h - 1 and 1 <= nx < room.w - 1 and (ny, nx) not in seen \
+                        and (ny, nx) not in lava:
+                    seen.add((ny, nx))
+                    frontier.append((ny, nx))
+        return all(p in seen for p in protected)
+
+    def _apply_lava(self):
+        """
+        Scatter lava over the interiors of puzzle-free rooms.
+
+        Each interior tile is proposed with probability lava_density, in random order, and kept
+        only if the tiles inside each doorway, the room centre (spawn / exit) and the key stay
+        mutually reachable without crossing lava.
+        """
+        if self.config['lava_density'] <= 0: return
+        for pos in sorted(self.grid):
+            room = self.grid[pos]
+            if room.puzzle_type != PuzzleType.NONE: continue
+            inside_door = {Direction.NORTH: lambda o: (room.h - 2, o), Direction.SOUTH: lambda o: (1, o),
+                           Direction.EAST: lambda o: (o, room.w - 2), Direction.WEST: lambda o: (o, 1)}
+            protected = [(room.h // 2, room.w // 2)] + [inside_door[d](o) for d, o in room.doors.items()]
+            if room.has_key and room.key_pos:
+                protected.append(tuple(room.key_pos))
+            tiles = [(y, x) for y in range(1, room.h - 1) for x in range(1, room.w - 1)
+                     if (y, x) not in protected]
+            self.rng.shuffle(tiles)
+            for tile in tiles:
+                if self.rng.random() >= self.config['lava_density']: continue
+                if self._lava_keeps_room_connected(room, room.lava | {tile}, protected):
+                    room.lava.add(tile)
+            if room.lava:
+                room.freeze()

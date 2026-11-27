@@ -13,7 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from boltcrypt.envs.defines import (TILE_BOULDER, TILE_COLUMN, TILE_DOOR, TILE_EMPTY, TILE_EXIT,
-                                    TILE_KEY, TILE_STONE, TILE_WALL)
+                                    TILE_KEY, TILE_LAVA, TILE_STONE, TILE_WALL)
 from boltcrypt.envs.step_noise import DIRECTION_PERMS, NOISE_STONE, NOISE_WARP
 
 P_BOULDER, P_PLATES, P_WARP_CYCLE, P_WARP_RND = 1, 2, 4, 5
@@ -49,12 +49,17 @@ class Params(NamedTuple):
     max_steps: int = 1000    # truncation, as gymnasium's TimeLimit on BoltCrypt-v0
 
 
+# The large per-tile arrays stay compact on device and are widened where they are read
+COMPACT_KEYS = ("grid", "cand_index", "cands")
+
+
 def bank_to_device(bank: dict) -> dict:
-    """Keep only the arrays the step function reads, as int32/bool device arrays."""
+    """Keep only the arrays the step function reads; small ones as int32, large ones compact."""
     out = {}
     for k in BANK_KEYS:
         v = np.asarray(bank[k])
-        out[k] = jnp.asarray(v if v.dtype in (bool, np.uint32) else v.astype(np.int32))
+        keep = v.dtype in (bool, np.uint32) or k in COMPACT_KEYS
+        out[k] = jnp.asarray(v if keep else v.astype(np.int32))
     return out
 
 
@@ -89,7 +94,7 @@ def _at(pos, y, x):
 
 def _room_grid(bank, s, room):
     """Static tiles of a room, with the key tile cleared once the key is held."""
-    grid = bank["grid"][s.level, room]
+    grid = bank["grid"][s.level, room].astype(jnp.int32)
     m = grid.shape[0]
     ys, xs = jnp.arange(m)[:, None], jnp.arange(m)[None, :]
     ky, kx = bank["key_pos"][s.level, 0], bank["key_pos"][s.level, 1]
@@ -168,8 +173,9 @@ def observe(bank, s):
 
 def step(bank, s, action, params: Params = Params()):
     """
-    BoltCrypt.step for one environment. Returns (state, reward, terminated, truncated, trapped).
-    Call observe() for the observation. Stepping after termination is as undefined as in Python.
+    BoltCrypt.step for one environment. Returns (state, reward, terminated, truncated, info) with
+    info = {"trapped", "died"} as in Python. Call observe() for the observation. Stepping after
+    termination is as undefined as in Python.
     """
     lvl, room = s.level, s.room
     seed = bank["seed"][lvl]
@@ -238,7 +244,8 @@ def step(bank, s, action, params: Params = Params()):
     reward = jnp.where(puzzle_reward, 1.0, reward)
     at_exit = c_floor & (static == TILE_EXIT)
     reward = jnp.where(at_exit, 10.0, reward)
-    done = at_exit
+    died = c_floor & (static == TILE_LAVA)
+    done = at_exit | died
 
     s = s._replace(
         room=new_room, lx=lx, ly=ly,
@@ -250,22 +257,26 @@ def step(bank, s, action, params: Params = Params()):
     # 3. Warps act on wherever the agent now stands, including after a bump
     room = s.room
     wtype = bank["ptype"][lvl, room]
-    ci = bank["cand_index"][lvl, room, s.ly, s.lx]
+    ci = bank["cand_index"][lvl, room, s.ly, s.lx].astype(jnp.int32)
     n = bank["n_cands"][lvl, room]
     on_warp = ((wtype == P_WARP_CYCLE) | (wtype == P_WARP_RND)) & (ci >= 0)
     k = _randint(n - 1, seed, t, NOISE_WARP)
     dest_i = jnp.where(wtype == P_WARP_CYCLE, (ci + 1) % jnp.maximum(n, 1), k + (k >= ci))
-    dest = bank["cands"][lvl, room, jnp.clip(dest_i, 0, bank["cands"].shape[2] - 1)]
+    dest = bank["cands"][lvl, room, jnp.clip(dest_i, 0, bank["cands"].shape[2] - 1)].astype(jnp.int32)
     warp = on_warp & ~jnp.any(_at(s.stones[room], dest[0], dest[1]))
     s = s._replace(ly=jnp.where(warp, dest[0], s.ly), lx=jnp.where(warp, dest[1], s.lx))
 
     truncated = (s.t >= params.max_steps) & ~done
-    return s, reward, done, truncated, s.sprung[s.room]
+    return s, reward, done, truncated, {"trapped": s.sprung[s.room], "died": died}
 
 
-def step_autoreset(bank, s, action, key, params: Params = Params()):
-    """step(), then start a uniformly drawn bank level when the episode ends."""
-    s, reward, done, truncated, trapped = step(bank, s, action, params)
-    fresh = reset(bank, jax.random.randint(key, (), 0, bank["seed"].shape[0]))
+def step_autoreset(bank, s, action, key, params: Params = Params(), level_lo=0, level_n=None):
+    """
+    step(), then start a uniformly drawn level when the episode ends. Levels are drawn from
+    bank indices [level_lo, level_lo + level_n), the whole bank by default.
+    """
+    s, reward, done, truncated, info = step(bank, s, action, params)
+    level_n = bank["seed"].shape[0] if level_n is None else level_n
+    fresh = reset(bank, jax.random.randint(key, (), level_lo, level_lo + level_n))
     s = jax.tree_util.tree_map(lambda a, b: jnp.where(done | truncated, a, b), fresh, s)
-    return s, reward, done, truncated, trapped
+    return s, reward, done, truncated, info
