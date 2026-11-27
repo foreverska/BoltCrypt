@@ -56,6 +56,7 @@ The DungeonGenerator and BoltCrypt environment can be customized via a config di
 **puzzle_density:** Chance of a room containing a boulder puzzle.  
 **key_puzzle_prob:** Chance that the exit is locked and a key is hidden in a leaf room.  
 **trap_prob:** Chance that an off-route room is a trap: its doors seal once entered, for the rest of the episode. Traps never cut off the start, key, or exit.  
+**lava_density:** Chance that each interior tile of a puzzle-free room is lava, which ends the episode when stepped on. Doorways, room centres and keys always stay reachable.  
 **randomize_end_distance:** If True, randomizes the actual distance from min_dist to 2*min_dist.  
 
 

@@ -31,6 +31,8 @@ CONFIGS = {
     "everything": dict(min_dist=1, mean_rooms=5, std_rooms=1, connectivity=0.6, puzzle_density=0.7,
                        key_puzzle_prob=0.5, trap_prob=0.2, puzzle_required=True, min_room_dim=4,
                        max_room_dim=10),
+    "lava": dict(min_dist=1, mean_rooms=4, std_rooms=1, connectivity=0.4, key_puzzle_prob=0.5,
+                 lava_density=0.08, min_room_dim=5, max_room_dim=9),
 }
 
 
@@ -43,7 +45,7 @@ def _python_rollout(cfg, seed, actions):
         boulders, stones = [list(b) for b in room.boulders], [list(x) for x in room.stones]
         obs, reward, done, _, info = env.step(int(a))
         frames.append((obs["grid"].copy(), obs["agent_pos"].copy(), obs["global_pos"].copy(),
-                       int(obs["inventory"]), np.float32(reward), done, info["trapped"]))
+                       int(obs["inventory"]), np.float32(reward), done, info["trapped"], info["died"]))
         if env.curr_room is not room:
             cov["door"] += 1
         elif int(np.abs(obs["agent_pos"] - pos).sum()) > 1:
@@ -52,7 +54,8 @@ def _python_rollout(cfg, seed, actions):
         cov["stone"] += room.stones != stones
         cov["bonus"] += reward == 1.0
         cov["trapped"] += info["trapped"]
-        cov["exit"] += done
+        cov["exit"] += done and not info["died"]
+        cov["died"] += info["died"]
         if done:
             break
     return frames, cov
@@ -63,9 +66,10 @@ def _jax_rollout(bank, actions):
 
     def run(level, acts):
         def body(s, a):
-            s, r, d, _, trapped = jenv.step(dev, s, a)
+            s, r, d, _, info = jenv.step(dev, s, a)
             o = jenv.observe(dev, s)
-            return s, (o["grid"], o["agent_pos"], o["global_pos"], o["inventory"], r, d, trapped)
+            return s, (o["grid"], o["agent_pos"], o["global_pos"], o["inventory"], r, d,
+                       info["trapped"], info["died"])
         return jax.lax.scan(body, jenv.reset(dev, level), acts)[1]
 
     out = jax.jit(jax.vmap(run))(jnp.arange(actions.shape[0]), jnp.asarray(actions, jnp.int32))
@@ -81,7 +85,7 @@ def test_jax_matches_python(name):
     jx = _jax_rollout(bank, actions)
 
     coverage = Counter()
-    fields = ("grid", "agent_pos", "global_pos", "inventory", "reward", "done", "trapped")
+    fields = ("grid", "agent_pos", "global_pos", "inventory", "reward", "done", "trapped", "died")
     for i, seed in enumerate(seeds):
         frames, cov = _python_rollout(cfg, seed, actions[i])
         coverage += cov
@@ -93,6 +97,7 @@ def test_jax_matches_python(name):
 
     needed = {"boulders_keys_traps": ("door", "push", "bonus", "trapped"),
               "stones_warps": ("door", "warp", "stone"),
-              "everything": ("door", "exit")}[name]
+              "everything": ("door", "exit"),
+              "lava": ("door", "died", "exit")}[name]
     missing = [k for k in needed if coverage[k] == 0]
     assert not missing, f"{name}: mechanics never exercised: {missing} (coverage {dict(coverage)})"

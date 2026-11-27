@@ -11,6 +11,7 @@ TILE_KEY = 6
 TILE_STONE = 7  # RND "Sailing Stone"
 TILE_WARP = 8  # ICM "Warp Tile"
 TILE_COLUMN = 9
+TILE_LAVA = 10  # Lethal: ends the episode
 
 # DIMENSIONS
 MIN_ROOM_DIM = 4  # Bumped up slightly to fit puzzles

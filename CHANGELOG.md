@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `lava_density`: lethal lava tiles in puzzle-free rooms. Stepping on one terminates the episode,
+  and `info['died']` reports it. Tiles are kept only if doorways, the room centre and any key
+  stay mutually reachable, and placement draws nothing when disabled. Lava is visible (`TILE_LAVA`
+  = 10), drawn by `NaturalLanguage` (which no longer announces a victory on death), and supported
+  by the JAX port under the parity test.
 - `boltcrypt.jaxenv`: functional JAX port (`reset`/`step`/`observe`/`step_autoreset`) on a bank of
   pre-generated levels (`level_bank.build_bank`/`save_bank`/`load_bank`), with a step-by-step
   parity test against the Python env run in CI on the CPU backend. Optional extra `[jax]`.
@@ -20,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite (`pip install -e .[test]`, `pytest`) and a GitHub Actions workflow that runs it.
 
 ### Changed
+- `boltcrypt.jaxenv.env.step` / `step_autoreset` return an info dict (`trapped`, `died`) in place
+  of the bare trapped flag. `step_autoreset` can draw levels from a sub-range of the bank.
+- Device banks keep the large per-tile arrays compact; warp candidate lists are sized to the bank.
 - In-episode randomness (sailing stones, random warps) is now a pure function of
   (level seed, episode step) via `boltcrypt.envs.step_noise`, so other implementations can match
   trajectories exactly. Stochastic trajectories differ from 0.1.2 for the same seed.

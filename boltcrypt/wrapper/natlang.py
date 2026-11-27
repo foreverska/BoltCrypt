@@ -101,7 +101,7 @@ class NaturalLanguage(gym.Wrapper):
         intro_text = (
             "*** SYSTEM: PROTOCOL INITIATED ***\n"
             "MISSION: Escape the Labyrinth.\n"
-            "INSTRUCTIONS: The room is a grid. The dungeon is a set of connected rooms. Solve puzzles to unlock doors. Doors not locked by a puzzle may need a key. Reach the Exit.\n"
+            "INSTRUCTIONS: The room is a grid. The dungeon is a set of connected rooms. Solve puzzles to unlock doors. Doors not locked by a puzzle may need a key. Lava ([LAV]) is deadly. Reach the Exit.\n"
             "Commands: NORTH, SOUTH, EAST, WEST, LOOK, RESET, HINT, QUIT.\n"
             "Commands may be chained (e.g., 'north, east, look') or used alone.\n"
         )
@@ -239,6 +239,8 @@ class NaturalLanguage(gym.Wrapper):
 
         event_str = " ".join(events) if events else "Time passes..."
 
+        if done and info.get("died"):
+            return f"{event_str} You step into the LAVA.\n\n*** YOU HAVE PERISHED. ***", reward, done, trunc, info
         if done:
             return f"{event_str}\n\n*** VICTORY! YOU HAVE ESCAPED! ***", reward, done, trunc, info
 
@@ -434,6 +436,8 @@ class NaturalLanguage(gym.Wrapper):
                         row_str += "[KEY]"
                     elif tile == 9:
                         row_str += "[COL]"
+                    elif tile == 10:
+                        row_str += "[LAV]"
                     else:
                         row_str += "[   ]"
                 grid_viz.append(row_str)

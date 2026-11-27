@@ -100,7 +100,8 @@ class BoltCrypt(gym.Env):
                 - reward: Float reward (-0.01 per step, +1.0 for key/puzzle, +10.0 for exit)
                 - done: Bool indicating episode termination (reaching exit)
                 - truncated: Bool (always False)
-                - info: Dict with 'trapped' (True once a trap room has sealed the agent in)
+                - info: Dict with 'trapped' (True once a trap room has sealed the agent in) and
+                  'died' (True if this step walked onto lava, which terminates the episode)
         """
         t = self.episode_step
         self.episode_step += 1
@@ -122,6 +123,7 @@ class BoltCrypt(gym.Env):
         target_lx, target_ly = self.lx + dx, self.ly + dy
         reward = -0.01
         done = False
+        died = False
 
         # 2. IN-ROOM MOVEMENT
         if 0 <= target_lx < self.curr_room.w and 0 <= target_ly < self.curr_room.h:
@@ -219,6 +221,9 @@ class BoltCrypt(gym.Env):
                     if static_tile == TILE_EXIT:
                         reward = 10.0
                         done = True
+                    elif static_tile == TILE_LAVA:
+                        died = True
+                        done = True
 
         # 3. OUT-OF-BOUNDS (Should not happen with proper door placement, but kept for safety)
         # Room transitions are now handled when stepping onto door tiles in section 2
@@ -239,7 +244,7 @@ class BoltCrypt(gym.Env):
                 if not stone_at_dest:
                     self.ly, self.lx = dest
 
-        return self._get_obs(), reward, done, False, {"trapped": self.curr_room.sprung}
+        return self._get_obs(), reward, done, False, {"trapped": self.curr_room.sprung, "died": died}
 
     def _get_obs(self):
         # Create a base grid
@@ -285,6 +290,8 @@ class BoltCrypt(gym.Env):
             [255, 215, 0],  # 6: Key
             [100, 100, 100],  # 7: Stone
             [148, 0, 211],  # 8: Warp
+            [90, 90, 110],  # 9: Column
+            [255, 90, 0],  # 10: Lava
         ], dtype=np.uint8)
 
         # Map the grid to RGB

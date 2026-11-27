@@ -13,7 +13,7 @@ class Room:
     __slots__ = ['x', 'y', 'w', 'h', 'is_start', 'is_exit', 'is_locked', 'has_key',
                  'doors', '_cached_grid', 'switches', 'columns', 'boulders', 'stones', 'warps',
                  'warp_mode', 'puzzle_type', 'is_solved', 'previously_solved', 'key_pos',
-                 'active_plate', 'plate_door_map', 'is_trap', 'sprung']
+                 'active_plate', 'plate_door_map', 'is_trap', 'sprung', 'lava']
 
     def __init__(self, x: int, y: int, w: int, h: int, is_start=False, is_exit=False):
         """
@@ -36,6 +36,7 @@ class Room:
         self.key_pos = None
         self.is_trap = False  # Doors seal for the rest of the episode once entered
         self.sprung = False
+        self.lava = set()  # (y, x) lethal tiles
 
         self.doors = {}
         self.puzzle_type = PuzzleType.NONE
@@ -298,6 +299,9 @@ class Room:
 
         for (sy, sx) in self.columns:
             grid[sy, sx] = TILE_COLUMN
+
+        for (ly, lx) in self.lava:
+            grid[ly, lx] = TILE_LAVA
 
         # Switches
         for (sy, sx) in self.switches:
